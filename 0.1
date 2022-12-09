@@ -1,0 +1,134 @@
+import processing.video.*;
+PImage brush;
+
+Capture cam;
+
+color trackedColor;
+float prevAvgX;
+float prevAvgY;
+
+float threshold;
+
+float tRed;
+float tGreen;
+float tBlue;
+
+
+
+void setup() {
+  brush = loadImage("inkBrushWhite.png");
+  size(1280, 720);
+  background(0);
+  //fullScreen(P2D);
+  
+  String[] cameras = Capture.list();
+  printArray(cameras);
+  cam = new Capture(this, cameras[0]);
+  cam.start();
+  //imageMode(CENTER);
+  
+  trackedColor = color(225, 0, 0);
+}
+
+void captureEvent(Capture cam){
+  //read cam
+  cam.read();
+}
+
+void draw(){
+  cam.loadPixels();
+  //background(0);
+  //image(cam, 0, 0);
+  pushMatrix(); 
+  scale(1, 1);
+  image(cam, cam.width, 0);
+  popMatrix();
+  
+   threshold = map(mouseX, 0, width, 0, 100);
+
+    float avgX = 0;
+    float avgY = 0;
+    int count = 0;
+  
+  //loop through all pixels
+  for (int xPixels = 0; xPixels<cam.width; xPixels++){
+    for(int yPixels = 0; yPixels < cam.height; yPixels++){
+      //pixels location
+      int pixelLoc = xPixels+yPixels*cam.width;
+      //current color of pixelLoc
+      color currentColor = cam.pixels[pixelLoc];
+      //color channel of currentColor
+      float cRed = red(currentColor);
+      float cGreen = green(currentColor);
+      float cBlue = blue(currentColor);
+      //color channel of trackedColor
+      tRed = red(trackedColor);
+      tGreen = green(trackedColor);
+      tBlue = blue(trackedColor);
+      
+      //compare colors 
+      float ctDistance = distanceSq(cRed, cGreen, cBlue, tRed, tGreen, tBlue);
+      
+      
+      if (ctDistance < threshold*threshold){
+        avgX += xPixels;
+        avgY += yPixels;
+        count++;
+      }
+    }
+  }
+  
+  if (count > 0){
+    avgX = avgX/count;
+    avgY = avgY/count;
+    
+    float distanceX;
+    float distanceY;
+    
+    distanceX = abs(avgX - prevAvgX);
+    distanceY = abs(avgY - prevAvgY);
+    
+    float avDistance;
+    
+    avDistance = (distanceX+distanceY)/2;
+    
+    float colorChange = map(avDistance, 0 , 100, 0.005, 0.08);
+    
+    avDistance = map(avDistance, 0 , 200, 1, 40);
+    
+    prevAvgX = avgX;
+    prevAvgY = avgY;
+    
+    float brushAngle = atan2(avgX-prevAvgX, avgY-prevAvgY);
+    
+    for(int i = 0;i < 5;i++){
+      
+      float wiggleColor = random(-80,80);
+      tint(tRed+wiggleColor,tGreen+wiggleColor,tBlue+wiggleColor, 150);
+      
+      pushMatrix();
+      float wiggle = random(-20,20);
+      translate(avgX+wiggle, avgY+wiggle);
+      float wiggleAngle = random(-20, 20);
+      rotate(brushAngle+((3* PI)/2+wiggleAngle));
+      float wiggleScale = random(-0.009, 0.009);
+      scale(colorChange+wiggleScale);
+      image(brush, 0, 0);
+      popMatrix();
+    }
+    
+  }else{
+    ellipse(0, 0, 0, 0);
+  }
+}
+
+float distanceSq(float x1, float y1, float z1, float x2, float y2, float z2){
+  float d = (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) + (z2-z1)*(z2-z1);
+  return d;
+}
+
+
+void mousePressed(){
+  int loc = mouseX + mouseY*cam.width;
+  trackedColor = cam.pixels[loc];
+}
